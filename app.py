@@ -18,25 +18,41 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
 
-embeddings = HuggingFaceEndpoint(
-    repo_id="sentence-transformers/all-MiniLM-L6-v2",
-    task="feature-extraction"
-)
+# embeddings = HuggingFaceEndpoint(
+#     repo_id="sentence-transformers/all-MiniLM-L6-v2",
+#     task="feature-extraction"
+# )
 
 
-def create_db_from_youtube_video_url(video_url: str) -> FAISS:  #video_url should be string and the return type of this function is FAISS
+# def create_db_from_youtube_video_url(video_url: str) -> FAISS:  #video_url should be string and the return type of this function is FAISS
+#     loader = YoutubeLoader.from_youtube_url(video_url)
+#     transcript = loader.load()
+
+#     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+#     docs = text_splitter.split_documents(transcript)
+
+#     db = FAISS.from_documents(docs, embeddings)
+#     return db
+
+def create_db_from_youtube_video_url(video_url: str) -> FAISS:
     loader = YoutubeLoader.from_youtube_url(video_url)
-    transcript = loader.load()
+    
+    try:
+        transcript = loader.load()
+        if not transcript: 
+            raise ValueError("No transcript available for this video.")
+        
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+        docs = text_splitter.split_documents(transcript)
+        db = FAISS.from_documents(docs, embeddings)
+        return db
 
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-    docs = text_splitter.split_documents(transcript)
-
-    db = FAISS.from_documents(docs, embeddings)
-    return db
-
+    except Exception as e:
+        print(f"Error loading transcript: {e}")
+        return None  
 
 
 def get_response_from_query(db, query, k=4):
@@ -84,6 +100,10 @@ def index():
         query = request.form["query"]
 
         db = create_db_from_youtube_video_url(video_url)
+
+        if db is None:  # If transcript is missing
+            return jsonify({"error": "Failed to load transcript. This video may not have captions."})
+
         response = get_response_from_query(db, query)
 
         return jsonify({"response": response})
