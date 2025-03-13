@@ -11,6 +11,7 @@ from sentence_transformers import SentenceTransformer
 import textwrap
 from langchain_huggingface import HuggingFaceEndpoint
 from flask import Flask, request, render_template, jsonify
+from langchain_community.vectorstores import Chroma
 # for env variables
 load_dotenv()
 
@@ -37,7 +38,7 @@ embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-
 #     db = FAISS.from_documents(docs, embeddings)
 #     return db
 
-def create_db_from_youtube_video_url(video_url: str) -> FAISS:
+def create_db_from_youtube_video_url(video_url: str):
     loader = YoutubeLoader.from_youtube_url(video_url)
     
     try:
@@ -47,7 +48,7 @@ def create_db_from_youtube_video_url(video_url: str) -> FAISS:
         
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
         docs = text_splitter.split_documents(transcript)
-        db = FAISS.from_documents(docs, embeddings)
+        db = Chroma.from_documents(docs, embeddings)
         return db
 
     except Exception as e:
@@ -66,7 +67,6 @@ def get_response_from_query(db, query, k=4):
         max_new_tokens=400,  # Limit response length!
         do_sample=False,  # Disable random sampling for deterministic output
     )
-    
     
 
     prompt = PromptTemplate(
